@@ -16,7 +16,7 @@ cat("Creating auxiliary functions...\n")
 
 free <- function() invisible(gc())
 
-create_dt <- function(is_train = TRUE, nrows = Inf) {
+create_dt <- function(is_train = TRUE, nrows = Inf, sample_size = 1000) {
   
   prices <- fread("./data/sell_prices.csv")
   cal <- fread("./data/calendar.csv")
@@ -24,7 +24,8 @@ create_dt <- function(is_train = TRUE, nrows = Inf) {
              is_weekend = as.integer(weekday %chin% c("Saturday", "Sunday")))]
   
   if (is_train) {
-    dt <- fread("./data/sales_train_validation.csv", nrows = nrows)
+    df <- fread("./data/sales_train_validation.csv", nrows = nrows)
+    dt <- df[sample(nrow(df), sample_size), ]
   } else {
     dt <- fread("./data/sales_train_validation.csv", nrows = nrows,
                 drop = paste0("d_", 1:(tr_last-max_lags)))
@@ -79,7 +80,8 @@ create_fea <- function(dt) {
 #---------------------------
 cat("Processing datasets...\n")
 cat("Processing datasets dt...\n")
-tr <- create_dt()
+
+tr <- create_dt(nrows = 1000) # was Inf
 free()
 
 cat("Processing datasets fea...\n")
@@ -120,6 +122,7 @@ free()
 #---------------------------
 cat("Training model...\n")
 cat("Training model poisson...\n")
+
 p <- list(objective = "poisson",
           metric ="rmse",
           force_row_wise = TRUE,
@@ -133,10 +136,10 @@ p <- list(objective = "poisson",
 cat("Training model lgb train...\n")
 m_lgb <- lgb.train(params = p,
                    data = xtr,
-                   nrounds = 2000,
+                   nrounds = 2000, # 2000,
                    valids = list(valid = xval),
                    early_stopping_rounds = 400,
-                   eval_freq = 200)
+                   eval_freq = 200) #200)
 
 cat("Best score:", m_lgb$best_score, "at", m_lgb$best_iter, "iteration")
 lgb.plot.importance(lgb.importance(m_lgb), 20)
@@ -162,4 +165,3 @@ te[date >= fday
      ][, d := paste0("F", 1:28), by = id
        ][, dcast(.SD, id ~ d, value.var = "sales")
          ][, fwrite(.SD, "sub_dt_lgb.csv")]
-
