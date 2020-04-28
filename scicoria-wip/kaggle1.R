@@ -7,7 +7,7 @@ library(lightgbm)
 set.seed(0)
 
 h <- 28
-
+max_lags <- 366
 tr_last <- 1913
 fday <- as.IDate("2016-04-25")
 
@@ -81,7 +81,7 @@ create_fea <- function(dt) {
 cat("Processing datasets...\n")
 cat("Processing datasets dt...\n")
 
-tr <- create_dt(nrows = 1000) # was Inf
+tr <- create_dt() #nrows = 1000) # was Inf
 free()
 
 cat("Processing datasets fea...\n")
@@ -165,3 +165,4 @@ te[date >= fday
      ][, d := paste0("F", 1:28), by = id
        ][, dcast(.SD, id ~ d, value.var = "sales")
          ][, fwrite(.SD, "sub_dt_lgb.csv")]
+         
