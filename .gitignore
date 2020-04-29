@@ -19,6 +19,7 @@
 
 # RStudio files
 .Rproj.user/
+.Rstudio
 
 # produced vignettes
 vignettes/*.html
@@ -190,3 +191,4 @@ dmypy.json
 # data
 .data/
 
+.Rproj.user
