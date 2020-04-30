@@ -180,7 +180,7 @@ te[date >= fday
    ][date >= fday+h, id := sub("validation", "evaluation", id)
      ][, d := paste0("F", 1:28), by = id
        ][, dcast(.SD, id ~ d, value.var = "sales")
-         ][, fwrite(.SD, "sub_dt_lgbV2.csv")]
+         ][, fwrite(.SD, "sub_dt_lgbV3.csv")]
          
 
          
