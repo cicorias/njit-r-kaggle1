@@ -1,5 +1,5 @@
 library(data.table)
-library(lightgbm)
+library(lightgbm) # lightgbm)
 
 
 #this was taken from existin Kaggle users submission
@@ -125,13 +125,13 @@ cat("Training model poisson...\n")
 
 p <- list(objective = "poisson",
           metric ="rmse",
-          #force_row_wise = TRUE,
+          force_row_wise = TRUE,
           learning_rate = 0.075,
           sub_feature = 0.8,
           sub_row = 0.75,
-          bagging_freq = 1,
+          bagging_freq = 10, # was 1
           lambda_l2 = 0.1,
-          nthread = 4)
+          nthread = 8)  # of cores
 
 cat("Training model lgb train...\n")
 m_lgb <- lgb.train(params = p,
