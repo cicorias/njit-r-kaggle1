@@ -6,8 +6,7 @@ library(ggplot2)
 
 set.seed(0)
 
-cores = 16
-out_file = 'sub_dt_lgb-v4.csv'
+cores = 8
 
 
 h <- 28 # forecast horizon
@@ -132,10 +131,10 @@ p <- list(objective = "poisson",
 
 m_lgb <- lgb.train(params = p,
                    data = xtr,
-                   nrounds = 5000,
+                   nrounds = 4000,
                    valids = list(val = xval),
                    early_stopping_rounds = 400,
-                   eval_freq = 500)
+                   eval_freq = 400)
 
 cat("Best score:", m_lgb$best_score, "at", m_lgb$best_iter, "iteration")   
 
@@ -181,7 +180,7 @@ te[date >= fday
    ][date >= fday+h, id := sub("validation", "evaluation", id)
      ][, d := paste0("F", 1:28), by = id
        ][, dcast(.SD, id ~ d, value.var = "sales")
-         ][, fwrite(.SD, out_file)]
+         ][, fwrite(.SD, "sub_dt_lgbV2.csv")]
          
 
          

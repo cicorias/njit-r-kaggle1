@@ -158,11 +158,14 @@ cat("Forecasting...\n")
 te <- create_dt(FALSE)
 
 for (day in as.list(seq(fday, length.out = 2*h, by = "day"))){
+  cat("for day setting up feature")
   cat(as.character(day), " ")
   tst <- te[date >= day - max_lags & date <= day]
+  cat("calling create_fea")
   create_fea(tst)
   tst <- data.matrix(tst[date == day][, c("id", "sales", "date") := NULL])
-  te[date == day, sales := predict(m_lgb, tst)]
+  cat("calling predict")
+  te[date == day, sales := predict(m_lgb)]
 }
 
 te[date >= fday
