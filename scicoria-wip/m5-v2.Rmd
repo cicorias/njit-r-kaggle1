@@ -1,0 +1,231 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+# Introduction
+
+I updated this notebook in order to make it easier for beginners to understand how it works. It is not a secret that R's [data.table](https://cran.r-project.org/web/packages/data.table/) has quite exotic syntax. At first sight, it is fairly obscure, but it is fully [comparable](https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.html) with SQL. Moreover, **data.table** is extremely [fast](https://github.com/Rdatatable/data.table/wiki/Benchmarks-%3A-Grouping) and memory efficient, especially with _by reference_ operations. Having learnt **data.table** [you can't help using it in your projects](https://i.pinimg.com/originals/ce/82/ba/ce82ba5fd7dbb77738f872f4e7167b38.png) ;-)
+
+
+# Preparations
+Let's load the packages and provide some basic parameters for our future model:
+```{r load, message=FALSE, warning=FALSE, results='show'}
+library(data.table)
+library(lightgbm)
+library(ggplot2)
+
+set.seed(0)
+
+cores = 8
+
+
+h <- 28 # forecast horizon
+max_lags <- 420 # number of observations to shift by
+tr_last <- 1913 # last training day
+fday <- as.IDate("2016-04-25") # first day to forecast
+nrows <- Inf
+```
+
+Also we need auxilary functions:
+
+* **free()** just calls a garbage collector
+
+```{r aux1, message=FALSE, warning=FALSE, results='show'}
+free <- function() invisible(gc()) 
+```
+
+* **create_dt()** creates a training or testing data table from a wide-format file with leading zeros removed. Pay attention to the cool feature of the **melt()** function and **data.table**: we can choose columns by regex patterns. Notice that I refer to the columns of the second table using _i._ prefix when merging the data tables (e.g. **i.event_name_1** is a column of the **cal** table).
+
+```{r aux2, message=FALSE, warning=FALSE, results='show'}
+create_dt <- function(is_train = TRUE, nrows = Inf) {
+  
+  if (is_train) { # create train set
+    dt <- fread("./data/sales_train_validation.csv", nrows = nrows)
+    cols <- dt[, names(.SD), .SDcols = patterns("^d_")]
+    dt[, (cols) := transpose(lapply(transpose(.SD),
+                                    function(x) {
+                                      i <- min(which(x > 0))
+                                      x[1:i-1] <- NA
+                                      x})), .SDcols = cols]
+    free()
+  } else { # create test set
+    dt <- fread("./data/sales_train_validation.csv", nrows = nrows,
+                drop = paste0("d_", 1:(tr_last-max_lags))) # keep only max_lags days from the train set
+    dt[, paste0("d_", (tr_last+1):(tr_last+2*h)) := 0] # add empty columns for forecasting
+  }
+  
+  dt <- na.omit(melt(dt,
+                     measure.vars = patterns("^d_"),
+                     variable.name = "d",
+                     value.name = "sales"))
+  
+  cal <- fread("./data/calendar.csv")
+  dt <- dt[cal, `:=`(date = as.IDate(i.date, format="%Y-%m-%d"), # merge tables by reference
+                     wm_yr_wk = i.wm_yr_wk,
+                     event_name_1 = i.event_name_1,
+                     snap_CA = i.snap_CA,
+                     snap_TX = i.snap_TX,
+                     snap_WI = i.snap_WI), on = "d"]
+  
+  prices <- fread("./data/sell_prices.csv")
+  dt[prices, sell_price := i.sell_price, on = c("store_id", "item_id", "wm_yr_wk")] # merge again
+}
+```
+
+* **create_fea()** adds lags, rolling features and time variables to the data table. **frollmean()** is a fast rolling function to calculate means on sliding window. Notice how we use _:=_ operation to add new columns.
+
+```{r aux3, message=FALSE, warning=FALSE, results='show'}
+
+create_fea <- function(dt) {
+  dt[, `:=`(d = NULL, # remove useless columns
+            wm_yr_wk = NULL)]
+  
+  cols <- c("item_id", "store_id", "state_id", "dept_id", "cat_id", "event_name_1") 
+  dt[, (cols) := lapply(.SD, function(x) as.integer(factor(x))), .SDcols = cols] # convert character columns to integer
+  free()
+  
+  lag <- c(7, 28) 
+  lag_cols <- paste0("lag_", lag) # lag columns names
+  dt[, (lag_cols) := shift(.SD, lag), by = id, .SDcols = "sales"] # add lag vectors
+  
+  win <- c(7, 28) # rolling window size
+  roll_cols <- paste0("rmean_", t(outer(lag, win, paste, sep="_"))) # rolling features columns names
+  dt[, (roll_cols) := frollmean(.SD, win, na.rm = TRUE), by = id, .SDcols = lag_cols] # rolling features on lag_cols
+  
+  dt[, `:=`(wday = wday(date), # time features
+            mday = mday(date),
+            week = week(date),
+            month = month(date),
+            year = year(date))]
+}
+```
+
+The next step is to prepare data for training. The data set itself is quite large, so we constantly need to collect garbage. Here I use the last 28 days for validation: 
+```{r prep1, message=FALSE, warning=FALSE, results='show'}
+tr <- create_dt()
+free()
+```
+Just to get the general idea let's plot grouped sales across all items:
+```{r plot0, message=FALSE, warning=FALSE, fig.align='center', fig.height=4, fig.width=8}
+tr[, .(sales = unlist(lapply(.SD, sum))), by = "date", .SDcols = "sales"
+   ][, ggplot(.SD, aes(x = date, y = sales)) +
+       geom_line(size = 0.3, color = "steelblue", alpha = 0.8) + 
+       geom_smooth(method='lm', formula= y~x, se = FALSE, linetype = 2, size = 0.5, color = "gray20") + 
+       labs(x = "", y = "total sales") +
+       theme_minimal() +
+       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position="none") +
+       scale_x_date(labels=scales::date_format ("%b %y"), breaks=scales::date_breaks("3 months"))]
+free()
+```
+
+We can see a trend and peaks at the end of each year. If only our model could model seasonality and trend...
+Ok, let's proceed to the next step and prepare a dataset for lightgbm:
+```{r prep2, message=FALSE, warning=FALSE, results='show'}
+create_fea(tr)
+free()
+
+tr <- na.omit(tr) # remove rows with NA to save memory
+free()
+
+idx <- tr[date <= max(date)-h, which = TRUE] # indices for training
+y <- tr$sales
+tr[, c("id", "sales", "date") := NULL]
+free()
+```
+```{r prep3, message=FALSE, warning=FALSE, results='show'}
+tr <- data.matrix(tr)
+free()
+```
+```{r prep4, message=FALSE, warning=FALSE, results='show'}
+cats <- c("item_id", "store_id", "state_id", "dept_id", "cat_id", 
+          "wday", "mday", "week", "month", "year",
+          "snap_CA", "snap_TX", "snap_WI") # list of categorical features
+xtr <- lgb.Dataset(tr[idx, ], label = y[idx], categorical_feature = cats) # construct lgb dataset
+xval <- lgb.Dataset(tr[-idx, ], label = y[-idx], categorical_feature = cats)
+
+rm(tr, y, cats, idx)
+free()
+```
+
+# Training model
+It's time to train our not so simple model with [**poisson**](https://en.wikipedia.org/wiki/Poisson_distribution) loss, which is suitable for counts. Lately I tune tree models manually following this approach: 
+<center>
+![](https://www.googleapis.com/download/storage/v1/b/kaggle-user-content/o/inbox%2F89435%2Fa2aa5bea79c2b87d3f30c7cbfbceb1b1%2Ftune.png?generation=1586789020090061&alt=media)
+</center>
+
+```{r train, message=FALSE, warning=FALSE, results='show'}
+p <- list(objective = "poisson",
+          metric ="rmse",
+          force_row_wise = TRUE,
+          learning_rate = 0.075,
+          num_leaves = 128,
+          min_data = 100,
+          sub_feature = 0.8,
+          sub_row = 0.75,
+          bagging_freq = 1,
+          lambda_l2 = 0.1,
+          nthread = cores)
+
+m_lgb <- lgb.train(params = p,
+                   data = xtr,
+                   nrounds = 4000,
+                   valids = list(val = xval),
+                   early_stopping_rounds = 400,
+                   eval_freq = 400)
+
+cat("Best score:", m_lgb$best_score, "at", m_lgb$best_iter, "iteration")   
+
+imp <- lgb.importance(m_lgb)
+
+rm(xtr, xval, p)
+free()
+```
+```{r plot2, message=FALSE, warning=FALSE, results='show'}
+imp[order(-Gain)
+    ][1:15, ggplot(.SD, aes(reorder(Feature, Gain), Gain)) +
+        geom_col(fill = "steelblue") +
+        xlab("Feature") +
+        coord_flip() +
+        theme_minimal()]
+```
+
+We can see that rolling features are very important. I have to admit that chaining with **data.table** is very convenient, especially when we want to use **j** for side effects.
+
+# Forecasting
+And now the hard part. As we are using 7-day lag features we have to forecast day by day in order to use the latest predictions for the current day. This slows down the forecasting process tremendously. Also, tree models are unable to extrapolate that's why here we use some kind of "magic" multiplier which slightly inflates predictions.
+
+```{r fc1, message=FALSE, warning=FALSE, results='show'}
+te <- create_dt(FALSE, nrows)
+
+for (day in as.list(seq(fday, length.out = 2*h, by = "day"))){
+  cat(as.character(day), " ")
+  tst <- te[date >= day - max_lags & date <= day]
+  create_fea(tst)
+  tst <- data.matrix(tst[date == day][, c("id", "sales", "date") := NULL])
+  te[date == day, sales := 1.03*predict(m_lgb, tst, n_jobs = cores)]
+}
+```
+Let's plot our predictions along with given values:
+```{r plot3, message=FALSE, warning=FALSE, fig.align='center', fig.height=4, fig.width=8}
+te[, .(sales = unlist(lapply(.SD, sum))), by = "date", .SDcols = "sales"
+   ][, ggplot(.SD, aes(x = date, y = sales, colour = (date < fday))) +
+       geom_line() + 
+       geom_smooth(method='lm', formula= y~x, se = FALSE, linetype = 2, size = 0.3, color = "gray20") + 
+       labs(x = "", y = "total sales") +
+       theme_minimal() +
+       theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position="none") +
+       scale_x_date(labels=scales::date_format ("%b %d"), breaks=scales::date_breaks("14 day"))]
+```
+
+Well, not great not terrible.
+
+Finally, the last step is to save predictions having casted them into the wide format:
+```{r fc2, message=FALSE, warning=FALSE, results='show'}
+te[date >= fday
+   ][date >= fday+h, id := sub("validation", "evaluation", id)
+     ][, d := paste0("F", 1:28), by = id
+       ][, dcast(.SD, id ~ d, value.var = "sales")
+         ][, fwrite(.SD, "sub_dt_lgbV2.csv")]
+```
