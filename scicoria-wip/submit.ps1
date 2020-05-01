@@ -1,10 +1,15 @@
 Param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true, Position = 1)]
     [String]
-    $fileName,
+    $File,
+    [Parameter(Position = 2)]
     [String]
-    $xtraMessage
+    $Message
 )
 
+$msg = "submission for team $xtraMessage"
 
-kaggle competitions submit -c m5-forecasting-accuracy -f $fileName -m "submission for team " + $xtraMessage
+kaggle competitions submit -c m5-forecasting-accuracy -f $file -m $msg
+Write-Debug $File
+Write-Debug $msg
+
