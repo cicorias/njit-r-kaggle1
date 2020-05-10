@@ -1,13 +1,22 @@
 ---
 title: "Kaggle project assignment - CS 636 IJ4"
 date: "May 11 2020"
-authors: ["Gene Eagle", "Ted Moore", "Shawn Cicoria"]
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+authors:
+- Gene Eagle
+- Ted Moore
+- Shawn Cicoria
 ---
 
 
 # Kaggle project assignment
 
+#### Gene Eagle, Ted Moore, Shawn Cicoria
+> {ge29, tm437, sc2443} @njit.edu
 
 > You will work on the below Kaggle challenge: https://www.kaggle.com/c/m5-forecasting-accuracy
 
