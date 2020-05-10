@@ -98,7 +98,7 @@ However, run times were **EXTREMELY LONG** - in some cases 24 hours, and often e
 
 ## Training performance
 
-
+![feature gain](./images/feature-gain.jp.jpg)
 
 
 ## Final Testing performance and Public Leadearboard Ranking
@@ -106,6 +106,12 @@ However, run times were **EXTREMELY LONG** - in some cases 24 hours, and often e
 The final position in the Kaggle competition at time of this report:
 
 ![leaderboard](./images/leaderboard.jpg) 
+
+
+![model performance](./images/model-performance.jpg)
+
+
+![model prediction](./images/model-prediction.jpg)
 
 
 
