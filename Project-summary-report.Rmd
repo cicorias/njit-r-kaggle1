@@ -51,9 +51,9 @@ authors:
 ## Pipeline and Methods
 
 ### Dataset size issues
-The team at first realized the size of the data was going to be an issue. We first examined the data and basid exploratory data analysis and realized the extend and size of the data would most likely be an issue.
+The team at first realized the size of the data was going to be an issue. We first examined the data and basic exploratory data analysis and realized the extend and size of the data would most likely be an issue.
 
-First atttempts at running on local machines basic models caused errors with memory consumption.
+First attempts at running on local machines basic models caused errors with memory consumption.
 
 At first we utilize sampling of the data to limit the the number of training samples for training the model, but that achieve horrible performance.  For example, the following used conditional sampling for our "read data" function that was used both in training and prediction.
 
@@ -74,9 +74,9 @@ create_dt <- function(is_train = TRUE, nrows = Inf, sample_size = 1000) {
   }
 ```
 
-Reviewing other examples in Kaggle we ended up taking advantage of the [`data.table`](https://rdatatable.gitlab.io/data.table/) package that provides both fast read capabilities and is memory efficient.  In addition it introduced some operators for the data that helped in providing concise fluent API for quering the data - a "chain like" approach similar to `%>% for other R packages.
+Reviewing other examples in Kaggle we ended up taking advantage of the [`data.table`](https://rdatatable.gitlab.io/data.table/) package that provides both fast read capabilities and is memory efficient.  In addition it introduced some operators for the data that helped in providing concise fluent API for querying the data - a "chain like" approach similar to `%>% for other R packages.
 
-The following vignette and artile are good overviews:
+The following vignette and article are good overviews:
 - https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.html
 - https://www.machinelearningplus.com/data-manipulation/datatable-in-r-complete-guide/
 
@@ -85,18 +85,28 @@ From the examples the syntax allows complex conditional clauses, SQL like within
 
 ### Dataset time series and prediction shapes
 
-#### Datase features
+
+### Dataset features
+The dataset acknowledged holidays, but only on the single observed day. It was our hypothesis that sales trends might be
+affected for a period prior to the individual events, so we engineered a feature that flagged the 7-day-prior period
+for each holiday. While this reduced MSE, it did not improve accuracy on the unseen data, implying overfitting. It's
+possible that by having week numbers (1-52) is enough give that holidays generally occur at the same time each year
 
 
 ### Review of existing models and choice
 
-The initial set of scripts in R were taken from an existing R notebook for Sales Data. This notebook made use of [LightGBM](https://lightgbm.readthedocs.io/en/latest/) simlar to XGboots
+The initial set of scripts in R were taken from an existing R notebook for Sales Data. This notebook made use of [LightGBM](https://lightgbm.readthedocs.io/en/latest/) similar to XGboost
 
 
 ### LightGBM
 ```
 LightGBM is a gradient boosting framework that uses tree based learning algorithms. It is designed to be distributed and efficient with the following advantages:
 ```
+- Higher efficiency as well as faster training speed.
+- Usage of lower memory.
+- Better accuracy.
+- Supports Parallel and GPU learning.
+- Data of large-scale can be handled
 
 
 ## Aquiring a VERY large VM
