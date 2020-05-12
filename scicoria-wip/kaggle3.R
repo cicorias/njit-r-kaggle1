@@ -6,8 +6,16 @@ library(ggplot2)
 
 set.seed(0)
 
-cores = 16
-out_file = 'sub_dt_lgb-v4.csv'
+cores = 8
+
+# tuning
+max_bins = 400 # default 255
+eta = 0.075
+epochs = 2500
+boosting_alg = 'gbdt'# 'dart' #default 'gbdt'
+
+
+out_file = 'sub_dt_lgb-v4-dart-5k.csv'
 
 
 h <- 28 # forecast horizon
@@ -120,21 +128,24 @@ free()
 
 p <- list(objective = "poisson",
           metric ="rmse",
-          force_row_wise = TRUE,
-          learning_rate = 0.075,
+          #force_row_wise = TRUE,
+          learning_rate = eta,
           num_leaves = 128,
           min_data = 100,
           sub_feature = 0.8,
           sub_row = 0.75,
+          max_bin = max_bins,
+          boosting = boosting_alg,
           bagging_freq = 1,
           lambda_l2 = 0.1,
           nthread = cores)
 
 m_lgb <- lgb.train(params = p,
                    data = xtr,
-                   nrounds = 5000,
+                   nrounds = epochs, # 10000, #5000,
                    valids = list(val = xval),
                    early_stopping_rounds = 400,
+                   force_row_wise = TRUE, #moved from params p
                    eval_freq = 500)
 
 cat("Best score:", m_lgb$best_score, "at", m_lgb$best_iter, "iteration")   
