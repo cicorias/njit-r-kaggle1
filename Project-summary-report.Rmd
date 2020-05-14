@@ -15,26 +15,11 @@ authors:
 
 # Kaggle project assignment
 
->TODO: Feature selection methods: Filter, Wrapper, Embedded
 
 #### Gene Eagle, Ted Moore, Shawn Cicoria
 > {ge29, tm437, sc2443} @njit.edu
 
-> You will work on the below Kaggle challenge: https://www.kaggle.com/c/m5-forecasting-accuracy
-
-
-1.	Form a team with no more than four students (including yourself)
-2.	Submit your result to Kaggle website
-3.	Submit a text file to Canvas including:
-    - Your team members and each one’s contribution; 
-    - Briefly explain your pipeline and methods; 
-    - The training performance
-    - The final testing performance and ranking in Public Leaderboard
-4.	Your score for this project will depend on your ranking in the Kaggle Public Leaderboard
-5.	Deadline for this project is May 14th, 2020
-
-
-
+\pagebreak
 
 # Project Report - Team [Godzilla](https://devblogs.microsoft.com/azuregov/3135/)
 
@@ -42,13 +27,15 @@ authors:
 
 | Member               | email           | Contribution |
 |----------------------|-----------------|--------------|
-| Gene Eagle           | ge29@njit.edu   |              |
-| Theodore (Ted) Moore | tm437@njit.edu  |              |
-| Shawn Cicoria        | sc2443@njit.edu |              |
+| Gene Eagle           | ge29@njit.edu   | Hyperparameter tuning, module coding, feature development  |
+| Theodore (Ted) Moore | tm437@njit.edu  | Feature creation, model tuning, module coding              |
+| Shawn Cicoria        | sc2443@njit.edu | Feature review, module coding, infrastructure setup        |
 
 
 
 ## Pipeline and Methods
+
+The initial R code was taken from [M5 ForecasteR [0.57330]](https://www.kaggle.com/kailex/m5-forecaster-0-57330/) but modified and improved to the point we were able to beat that notebook's score of `0.57`.
 
 ### Dataset size issues
 The team at first realized the size of the data was going to be an issue. We first examined the data and basic exploratory data analysis and realized the extend and size of the data would most likely be an issue.
@@ -83,15 +70,34 @@ The following vignette and article are good overviews:
 From the examples the syntax allows complex conditional clauses, SQL like within the statements to make the interaction with the dataset more concise and clearer.
 
 
-### Dataset time series and prediction shapes
+### Dataset for Training
+The data provided from Kaggle was essentially "wide" format with a column for every day, and rows representing item sales down to the granular level, but also aggregate records based upon their regional structures.
+
+
+The data plotted as a time series:
+
+![model performance](./images/model-performance.jpg)
 
 
 ### Dataset features
-The dataset acknowledged holidays, but only on the single observed day. It was our hypothesis that sales trends might be
-affected for a period prior to the individual events, so we engineered a feature that flagged the 7-day-prior period
-for each holiday. While this reduced MSE, it did not improve accuracy on the unseen data, implying overfitting. It's
-possible that by having week numbers (1-52) is enough give that holidays generally occur at the same time each year
+The dataset acknowledged holidays, but only on the single observed day. It was our hypothesis that sales trends might be affected for a period prior to the individual events, so we engineered a feature that flagged the 7-day-prior period for each holiday. While this reduced MSE, it did not improve accuracy on the unseen data, implying over-fitting. It's possible that by having week numbers (1-52) is enough give that holidays generally occur at the same time each year
 
+
+#### Features
+
+The goal was to look at the data more on a weekly vs daily period. Summaries and aggregations for periods were added using a span of 1 week to 4 weeks, in addition to supplementing the periods with holiday information.
+
+The columns were stripped down to just the day columns using a filter based upon a regular expression against the column names - specifically `"^d_"` and this was easily accomplished using the features of `data.table.
+
+Event names and weekend binary were added as well for the day.
+The primary features supplementing the data was adding a weekend binary indicator of "is weekend" or not.
+
+The remaining feature data, along with per-day sales, were:
+```
+"item_id", "store_id", "state_id", "dept_id", "cat_id", "event_name_1"
+```
+
+Two rolling means were also added - for 7 through 28 days - . These were all look-back periods.
 
 ### Review of existing models and choice
 
@@ -109,7 +115,7 @@ LightGBM is a gradient boosting framework that uses tree based learning algorith
 - Data of large-scale can be handled
 
 
-## Aquiring a VERY large VM
+## Acquiring a VERY large VM
 
 At first, memory consumption was an issue. Laptops with 16 Gig or less were not able to handle the entire dataset. Sampling helped, but performance with sampled data wasn't worth it.
 
@@ -120,20 +126,95 @@ However, run times were **EXTREMELY LONG** - in some cases 24 hours, and often e
 
 ## Training performance
 
+Training the model, since the competition was using `rmse`, that became the tuning parameter in the model.  After about 1900 iterations the model hit best convergence.
+
+```
+[LightGBM] [Warning] Unknown parameter: force_row_wise
+[LightGBM] [Warning] Met categorical feature which contains sparse values. Consider renumbering to consecutive integers started from zero
+[LightGBM] [Warning] Unknown parameter: force_row_wise
+[LightGBM] [Info] Total Bins 4575
+[LightGBM] [Info] Number of data: 44235060, number of used features: 21
+[LightGBM] [Warning] Unknown parameter: force_row_wise
+[LightGBM] [Info] Start training from score 0.355880
+[1]:	val's rmse:3.43623 
+[51]:	val's rmse:2.07949 
+[101]:	val's rmse:2.04125 
+[151]:	val's rmse:2.0389 
+
+[1851]:	val's rmse:2.00827 
+[1901]:	val's rmse:2.00802 
+[1951]:	val's rmse:2.0079 
+[2001]:	val's rmse:2.00799 
+[2051]:	val's rmse:2.00815 
+[2101]:	val's rmse:2.00836 
+[2151]:	val's rmse:2.00828 
+[2201]:	val's rmse:2.00816 
+[2251]:	val's rmse:2.00807 
+[2301]:	val's rmse:2.00796 
+[2351]:	val's rmse:2.00836 
+Best score: 2.007784 at 1958 iteration
+
+```
+
+### Best RMSE score:
+
+Our best score `Best score: 2.007784 at 1958 iteration` translated to a score of about `0.51` when submitted to Kaggle (see below).
+
+Training also showed that the rolling averages had the greatest influence on the score.
+
 ![feature gain](./images/feature-gain.jp.jpg)
+
+
+### Testing 
+
+For Testing, the data set is reset and additionally a forecast by looping through the calendar's first day, through 2 months outwards. The letter `h` below was used to change the horizon in the test runs, with `28` being the final choice - thus `2 * 28 = 56` is the look-ahead period.
+
+Then as each day is predicted using a window of 420 days look-back. The same set of features are created as done to supplement training.
+
+The use of `data.table` again, with it's "fluent" API (chaining statements) that allowed simple multi-conditionals really helped make working with the features and modifications easy.
+
+You can also see that we had a setting for `cores` that was there to enable use of multi-core VM - **64 cores** - and process that much faster. Although for some runs
+
+```
+
+h <- 28 # forecast horizon
+max_lags <- 420 # number of observations to shift by
+tr_last <- 1913 # last training day
+
+#...
+
+te <- create_dt(FALSE, nrows)
+
+for (day in as.list(seq(fday, length.out = 2*h, by = "day"))){
+  cat(as.character(day), " ")
+  tst <- te[date >= day - max_lags & date <= day]
+  create_fea(tst)
+  tst <- data.matrix(tst[date == day][, c("id", "sales", "date") := NULL])
+  te[date == day, sales := predict(m_lgb, tst, n_jobs = cores)]
+}
+
+```
 
 
 ## Final Testing performance and Public Leadearboard Ranking
 
-The final position in the Kaggle competition at time of this report:
-
-![leaderboard](./images/leaderboard.jpg) 
-
-
-![model performance](./images/model-performance.jpg)
+The plot of the historical and the prediction shown here:
 
 
 ![model prediction](./images/model-prediction.jpg)
+
+
+# Kaggle Standing
+
+The submission was automated via script:
+
+![](./images/submit-results.jpg)
+
+**1,339 rank**
+
+The final position in the Kaggle competition at time of this report:
+
+![leaderboard](./images/leaderboard.jpg) 
 
 
 
@@ -143,9 +224,11 @@ The final position in the Kaggle competition at time of this report:
 
 ![ranking-pag1](./images/ranking-part2.jpg)
 
-
-
 ![ranking-pag1](./images/ranking-part3.jpg)
 
+
+## Godzilla Virtual Machine
+
+![cpu-load](./images/cpu-load-1.jpg)
 
 
