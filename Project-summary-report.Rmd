@@ -57,6 +57,9 @@ First attempts at running on local machines basic models caused errors with memo
 
 At first we utilize sampling of the data to limit the the number of training samples for training the model, but that achieve horrible performance.  For example, the following used conditional sampling for our "read data" function that was used both in training and prediction.
 
+### XGBoost
+We also utilized the R XGBoost library, which provides highly optimized parallel tree boosting algorithms (GBDT, GBM) and allows extensive configuration (https://xgboost.readthedocs.io/en/latest/parameter.html).
+
 ```
 create_dt <- function(is_train = TRUE, nrows = Inf, sample_size = 1000) {
   prices <- fread("./data/sell_prices.csv")
@@ -117,6 +120,21 @@ Second boundary was CPU. Fortunately, the team has access to Microsoft Azure com
 
 However, run times were **EXTREMELY LONG** - in some cases 24 hours, and often easily 4 or more hours.
 
+In particular, running DART (http://proceedings.mlr.press/v38/korlakaivinayak15.pdf) proved to be a time consuming process (with the runs consistently being longer than 24 hours). In addition, resource monitoring indicated that the DART algorithm was in fact fully utilizing all of the 64 CPUs allocated on the Azure VM for a large part of the cycle.
+
+
+Via the LightGBM and XGBoost libraries, we investigated the effects of using the following:
+	•	Regression model – linear, Poisson
+	•	Boosting - Gradient Boosting Decision Tree, DART
+	•	Bagging
+	•	Regularization – LASSO, RIDGE, Elastic Network
+And the tuning of the following hyperparameters:
+	•	Learning rate
+	•	Bin size
+	•	Early stop
+	•	Epochs
+	•	Tree depth
+	•	Bagging ratio
 
 ## Training performance
 
