@@ -1757,7 +1757,22 @@ summary {
 <p>At first, memory consumption was an issue. Laptops with 16 Gig or less were not able to handle the entire dataset. Sampling helped, but performance with sampled data wasn’t worth it.</p>
 <p>Second boundary was CPU. Fortunately, the team has access to Microsoft Azure compute capabilities in for very large Virtual Machines. At one point the team was utilizing a Virtual Machine with 64 cores and 256 Gig of ram. Ultimately, the choice of the underlying package <a href="###%20LightGBM">LightGBM</a> the ability to parallel process on many cores permitted a bit better run times.</p>
 <p>However, run times were <strong>EXTREMELY LONG</strong> - in some cases 24 hours, and often easily 4 or more hours.</p>
-<p>In particular, running DART (<a href="http://proceedings.mlr.press/v38/korlakaivinayak15.pdf" class="uri">http://proceedings.mlr.press/v38/korlakaivinayak15.pdf</a>) proved to be a time consuming process (with the runs consistently being longer than 24 hours). In addition, resource monitoring indicated that the DART algorithm was in fact fully utilizing all of the 64 CPUs allocated on the Azure VM for a large part of the cycle. Via the LightGBM and XGBoost libraries, we investigated the effects of using the following: • Regression model – linear, Poisson • Boosting - Gradient Boosting Decision Tree, DART • Bagging • Regularization – LASSO, RIDGE, Elastic Network And the tuning of the following hyper-parameters: • Learning rate • Bin size • Early stop • Epochs • Tree depth • Bagging ratio</p>
+<p>In particular, running DART (<a href="http://proceedings.mlr.press/v38/korlakaivinayak15.pdf" class="uri">http://proceedings.mlr.press/v38/korlakaivinayak15.pdf</a>) proved to be a time consuming process (with the runs consistently being longer than 24 hours). In addition, resource monitoring indicated that the DART algorithm was in fact fully utilizing all of the 64 CPUs allocated on the Azure VM for a large part of the cycle. Via the LightGBM and XGBoost libraries, we investigated the effects of using the following:</p>
+<ul>
+<li>Regression model – linear, Poisson</li>
+<li>Boosting - Gradient Boosting Decision Tree, DART</li>
+<li>Bagging</li>
+<li>Regularization – LASSO, RIDGE, Elastic Network</li>
+</ul>
+<p>And the tuning of the following hyper-parameters:</p>
+<ul>
+<li>Learning rate</li>
+<li>Bin size</li>
+<li>Early stop</li>
+<li>Epochs</li>
+<li>Tree depth</li>
+<li>Bagging ratio</li>
+</ul>
 </div>
 <div id="training-performance" class="section level2">
 <h2>Training performance</h2>

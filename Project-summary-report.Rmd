@@ -128,17 +128,20 @@ However, run times were **EXTREMELY LONG** - in some cases 24 hours, and often e
 
 In particular, running DART (http://proceedings.mlr.press/v38/korlakaivinayak15.pdf) proved to be a time consuming process (with the runs consistently being longer than 24 hours). In addition, resource monitoring indicated that the DART algorithm was in fact fully utilizing all of the 64 CPUs allocated on the Azure VM for a large part of the cycle.
 Via the LightGBM and XGBoost libraries, we investigated the effects of using the following:
-	•	Regression model – linear, Poisson
-	•	Boosting - Gradient Boosting Decision Tree, DART
-	•	Bagging
-	•	Regularization – LASSO, RIDGE, Elastic Network
+
+- Regression model – linear, Poisson
+- Boosting - Gradient Boosting Decision Tree, DART
+- Bagging
+- Regularization – LASSO, RIDGE, Elastic Network
+
 And the tuning of the following hyper-parameters:
-	•	Learning rate
-	•	Bin size
-	•	Early stop
-	•	Epochs
-	•	Tree depth
-	•	Bagging ratio
+
+- Learning rate
+- Bin size
+- Early stop
+- Epochs
+- Tree depth
+- Bagging ratio
 
 
 ## Training performance
